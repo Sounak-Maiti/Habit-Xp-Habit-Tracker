@@ -38,6 +38,15 @@ export interface StreakData {
   lastCompletedDate?: string;
 }
 
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlockedAt?: Date;
+  xpReward: number;
+}
+
 export interface HabitStats {
   habitId: string;
   habitName: string;
@@ -55,6 +64,13 @@ interface HabitStore {
   goals: Goal[];
   selectedYear: number;
   selectedMonth: number;
+  
+  // Gamification State
+  totalXP: number;
+  currentLevel: number;
+  currentStreak: number;
+  longestStreak: number;
+  achievements: Achievement[];
   
   // Computed values
   monthlyStats: {
@@ -75,6 +91,14 @@ interface HabitStore {
   toggleHabitDay: (habitId: string, date: string) => void;
   setHabitDay: (habitId: string, date: string, completed: boolean) => void;
   getHabitDayDetails: (habitId: string, date: string) => HabitDay | undefined;
+  
+  // Gamification Actions
+  addXP: (amount: number) => void;
+  removeXP: (amount: number) => void;
+  calculateLevel: (xp: number) => number;
+  checkLevelUp: () => boolean;
+  unlockAchievement: (achievementId: string) => void;
+  updateStreak: () => void;
   
   addGoal: (goal: Omit<Goal, 'id'>) => void;
   removeGoal: (goalId: string) => void;
@@ -126,15 +150,18 @@ export const useHabitStore = create<HabitStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      habits: defaultHabits.map(h => ({
-        ...h,
-        id: generateId(),
-        createdAt: new Date()
-      })),
+      habits: [],
       habitDays: [],
-      goals: defaultGoals.map(g => ({ ...g, id: generateId() })),
+      goals: [],
       selectedYear: new Date().getFullYear(),
       selectedMonth: new Date().getMonth(),
+      
+      // Gamification State
+      totalXP: 0,
+      currentLevel: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      achievements: [],
       
       monthlyStats: {
         totalCompleted: 0,
@@ -159,10 +186,33 @@ export const useHabitStore = create<HabitStore>()(
       },
       
       removeHabit: (habitId) => {
-        set((state) => ({
-          habits: state.habits.filter(h => h.id !== habitId),
-          habitDays: state.habitDays.filter(hd => hd.habitId !== habitId)
-        }));
+        set((state) => {
+          // Find all habit days for this habit that were completed
+          const completedHabitDays = state.habitDays.filter(hd => hd.habitId === habitId && hd.completed);
+          
+          // Calculate XP to remove (10 XP per completed day + streak bonuses)
+          let xpToRemove = 0;
+          completedHabitDays.forEach(hd => {
+            // Calculate streak bonus for this specific day
+            const streakBonus = state.calculateStreak(habitId).current > 0 ? 5 : 0;
+            xpToRemove += 10 + streakBonus;
+          });
+          
+          // Remove the habit and its days
+          const newHabits = state.habits.filter(h => h.id !== habitId);
+          const newHabitDays = state.habitDays.filter(hd => hd.habitId !== habitId);
+          
+          // Calculate new XP and level
+          const newXP = Math.max(0, state.totalXP - xpToRemove);
+          const newLevel = Math.floor(newXP / 100);
+          
+          return {
+            habits: newHabits,
+            habitDays: newHabitDays,
+            totalXP: newXP,
+            currentLevel: newLevel
+          };
+        });
       },
       
       updateHabit: (habitId, updates) => {
@@ -185,6 +235,8 @@ export const useHabitStore = create<HabitStore>()(
             hd => hd.habitId === habitId && hd.date === date
           );
           
+          const wasPreviouslyCompleted = existingIndex >= 0 ? state.habitDays[existingIndex].completed : false;
+          
           if (existingIndex >= 0) {
             const updatedDays = [...state.habitDays];
             updatedDays[existingIndex] = { 
@@ -193,8 +245,27 @@ export const useHabitStore = create<HabitStore>()(
               completed,
               completedAt: completed ? new Date() : undefined
             };
+            
+            // Handle XP changes fairly
+            if (completed && !wasPreviouslyCompleted) {
+              // Gaining XP for new completion
+              const streakBonus = state.calculateStreak(habitId).current > 0 ? 5 : 0;
+              state.addXP(10 + streakBonus);
+            } else if (!completed && wasPreviouslyCompleted) {
+              // Losing XP for unchecking (fairness)
+              const streakBonus = state.calculateStreak(habitId).current > 0 ? 5 : 0;
+              state.removeXP(10 + streakBonus);
+            }
+            // If completed stays same, no XP change (prevents abuse)
+            
             return { habitDays: updatedDays };
           } else {
+            // New habit day
+            if (completed) {
+              const streakBonus = state.calculateStreak(habitId).current > 0 ? 5 : 0;
+              state.addXP(10 + streakBonus);
+            }
+            
             return {
               habitDays: [...state.habitDays, { 
                 habitId, 
@@ -204,6 +275,167 @@ export const useHabitStore = create<HabitStore>()(
               }]
             };
           }
+        });
+      },
+      
+      // Gamification Functions
+      addXP: (amount) => {
+        set((state) => {
+          const newXP = state.totalXP + amount;
+          const newLevel = Math.floor(newXP / 100);
+          const leveledUp = newLevel > state.currentLevel;
+          
+          // Check for level up achievements (direct update to avoid recursion)
+          const updatedAchievements = [...state.achievements];
+          if (leveledUp && !updatedAchievements.find(a => a.id === `level-${newLevel}`)) {
+            const achievementTemplates: { [key: string]: Omit<Achievement, 'unlockedAt'> } = {
+              'level-1': {
+                id: 'level-1',
+                name: 'Level 1',
+                description: 'Reach level 1',
+                icon: '1',
+                xpReward: 10
+              },
+              'level-2': {
+                id: 'level-2',
+                name: 'Level 2',
+                description: 'Reach level 2',
+                icon: '2',
+                xpReward: 20
+              },
+              'level-3': {
+                id: 'level-3',
+                name: 'Level 3',
+                description: 'Reach level 3',
+                icon: '3',
+                xpReward: 30
+              }
+            };
+            
+            const template = achievementTemplates[`level-${newLevel}`];
+            if (template) {
+              updatedAchievements.push({
+                ...template,
+                unlockedAt: new Date()
+              });
+            }
+          }
+          
+          return {
+            totalXP: newXP,
+            currentLevel: newLevel,
+            achievements: updatedAchievements
+          };
+        });
+      },
+      
+      removeXP: (amount) => {
+        set((state) => {
+          const newXP = Math.max(0, state.totalXP - amount);
+          const newLevel = Math.floor(newXP / 100);
+          
+          return {
+            totalXP: newXP,
+            currentLevel: newLevel
+          };
+        });
+      },
+      
+      calculateLevel: (xp) => {
+        return Math.floor(xp / 100);
+      },
+      
+      checkLevelUp: () => {
+        const state = get();
+        const newLevel = Math.floor(state.totalXP / 100);
+        return newLevel > state.currentLevel;
+      },
+      
+      unlockAchievement: (achievementId) => {
+        set((state) => {
+          if (state.achievements.find(a => a.id === achievementId)) {
+            return state; // Already unlocked
+          }
+          
+          // Define achievement templates
+          const achievementTemplates: { [key: string]: Omit<Achievement, 'unlockedAt'> } = {
+            'first-habit': {
+              id: 'first-habit',
+              name: 'First Habit Completed',
+              description: 'Complete your first habit',
+              icon: '1',
+              xpReward: 50
+            },
+            '7-day-streak': {
+              id: '7-day-streak',
+              name: '7 Day Streak',
+              description: 'Maintain a 7-day streak',
+              icon: '7',
+              xpReward: 100
+            },
+            'level-1': {
+              id: 'level-1',
+              name: 'Level 1',
+              description: 'Reach level 1',
+              icon: '1',
+              xpReward: 10
+            },
+            'level-2': {
+              id: 'level-2',
+              name: 'Level 2',
+              description: 'Reach level 2',
+              icon: '2',
+              xpReward: 20
+            },
+            'level-3': {
+              id: 'level-3',
+              name: 'Level 3',
+              description: 'Reach level 3',
+              icon: '3',
+              xpReward: 30
+            }
+          };
+          
+          const template = achievementTemplates[achievementId];
+          if (!template) return state;
+          
+          const newAchievement: Achievement = {
+            ...template,
+            unlockedAt: new Date()
+          };
+          
+          // Award XP for achievement (direct update to avoid recursion)
+          const newXP = state.totalXP + template.xpReward;
+          const newLevel = Math.floor(newXP / 100);
+          
+          return {
+            totalXP: newXP,
+            currentLevel: newLevel,
+            achievements: [...state.achievements, newAchievement]
+          };
+        });
+      },
+      
+      updateStreak: () => {
+        set((state) => {
+          let maxStreak = 0;
+          let currentStreak = 0;
+          
+          state.habits.forEach(habit => {
+            const streak = state.calculateStreak(habit.id);
+            maxStreak = Math.max(maxStreak, streak.best);
+            currentStreak = Math.max(currentStreak, streak.current);
+          });
+          
+          // Check for streak achievements
+          if (currentStreak >= 7) {
+            state.unlockAchievement('7-day-streak');
+          }
+          
+          return {
+            currentStreak,
+            longestStreak: Math.max(state.longestStreak, maxStreak)
+          };
         });
       },
       
@@ -368,13 +600,40 @@ export const useHabitStore = create<HabitStore>()(
     }),
     {
       name: 'habit-tracker-storage',
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        // Handle migration from version 0 (no version) to version 1
+        if (version === 0) {
+          // Ensure XP-related fields exist and are properly initialized
+          return {
+            ...persistedState,
+            totalXP: persistedState.totalXP || 0,
+            currentLevel: persistedState.currentLevel || 0,
+            currentStreak: persistedState.currentStreak || 0,
+            longestStreak: persistedState.longestStreak || 0,
+            achievements: persistedState.achievements || []
+          };
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         habits: state.habits,
         habitDays: state.habitDays,
         goals: state.goals,
         selectedYear: state.selectedYear,
-        selectedMonth: state.selectedMonth
-      })
+        selectedMonth: state.selectedMonth,
+        totalXP: state.totalXP,
+        currentLevel: state.currentLevel,
+        currentStreak: state.currentStreak,
+        longestStreak: state.longestStreak,
+        achievements: state.achievements
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Ensure XP and level are synchronized on rehydration
+        if (state && state.totalXP && state.currentLevel !== Math.floor(state.totalXP / 100)) {
+          state.currentLevel = Math.floor(state.totalXP / 100);
+        }
+      }
     }
   )
 );

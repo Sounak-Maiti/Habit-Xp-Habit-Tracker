@@ -24,6 +24,24 @@ export const HabitGrid: React.FC = () => {
   const daysInMonth = getDaysInMonth();
   const weeksInMonth = getWeeksInMonth(selectedYear, selectedMonth);
 
+  // Check if a date is today (users can only interact with today)
+  const isTodayDate = (date: string) => {
+    const today = new Date();
+    const checkDate = new Date(date);
+    return (
+      checkDate.getDate() === today.getDate() &&
+      checkDate.getMonth() === today.getMonth() &&
+      checkDate.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Handle habit toggle with date validation
+  const handleToggleHabitDay = (habitId: string, date: string) => {
+    if (isTodayDate(date)) {
+      toggleHabitDay(habitId, date);
+    }
+  };
+
   const handleAddHabit = () => {
     if (newHabitName.trim()) {
       addHabit({
@@ -132,12 +150,14 @@ export const HabitGrid: React.FC = () => {
                           key={day}
                           variants={cellVariants}
                           whileTap="tap"
-                          onClick={() => toggleHabitDay(habit.id, date)}
+                          onClick={() => handleToggleHabitDay(habit.id, date)}
                           className={`
                             w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all
-                            ${isCompleted 
-                              ? 'bg-gradient-to-br from-purple-500 to-blue-500 border-purple-500 text-white' 
-                              : 'bg-white border-gray-200 hover:border-purple-300 text-gray-400'
+                            ${!isTodayDate(date) 
+                              ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-60' 
+                              : isCompleted 
+                                ? 'bg-green-500 border-green-500 text-white hover:bg-green-600' 
+                                : 'bg-white border-gray-300 hover:border-purple-400 hover:bg-purple-50 cursor-pointer'
                             }
                             ${isCurrentDay ? 'ring-2 ring-purple-400 ring-offset-1' : ''}
                           `}

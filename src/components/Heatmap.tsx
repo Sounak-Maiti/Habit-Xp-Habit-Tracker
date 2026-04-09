@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Flame, Activity } from 'lucide-react';
 import { useHabitStore } from '@/store/habitStore';
@@ -19,8 +19,86 @@ export const Heatmap: React.FC = () => {
     habits, 
     selectedYear, 
     selectedMonth, 
-    getHabitDay
+    habitDays, 
+    getHabitDay,
+    calculateStreak 
   } = useHabitStore();
+
+  // Day timer state
+  const [timeLeft, setTimeLeft] = useState({
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  });
+
+  // Global times state
+  const [globalTimes, setGlobalTimes] = useState([
+    { city: 'New York', timezone: 'America/New_York', time: '', offset: '' },
+    { city: 'London', timezone: 'Europe/London', time: '', offset: '' },
+    { city: 'Delhi', timezone: 'Asia/Kolkata', time: '', offset: '' },
+    { city: 'Tokyo', timezone: 'Asia/Tokyo', time: '', offset: '' },
+    { city: 'Sydney', timezone: 'Australia/Sydney', time: '', offset: '' },
+    { city: 'Dubai', timezone: 'Asia/Dubai', time: '', offset: '' }
+  ]);
+
+  // Update timer every second
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const diff = endOfDay.getTime() - now.getTime();
+      
+      if (diff > 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setTimeLeft({ hours, minutes, seconds });
+      } else {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+
+    updateTimer();
+    updateGlobalTimes();
+    const interval = setInterval(() => {
+      updateTimer();
+      updateGlobalTimes();
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update global times
+  const updateGlobalTimes = () => {
+    const now = new Date();
+    const updatedTimes = globalTimes.map(city => {
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: city.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      };
+      
+      const timeString = now.toLocaleTimeString('en-US', options);
+      
+      // Get timezone offset
+      const timeZoneDate = new Date(now.toLocaleString('en-US', { timeZone: city.timezone }));
+      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const offset = (timeZoneDate.getTime() - utcDate.getTime()) / (1000 * 60 * 60);
+      const offsetString = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`;
+      
+      return {
+        ...city,
+        time: timeString,
+        offset: offsetString
+      };
+    });
+    
+    setGlobalTimes(updatedTimes);
+  };
 
   const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
 
@@ -90,9 +168,11 @@ export const Heatmap: React.FC = () => {
   const averagePercentage = heatmapData.length > 0 
     ? heatmapData.reduce((sum, day) => sum + day.percentage, 0) / heatmapData.length 
     : 0;
-  const bestDay = heatmapData.reduce((best, current) => 
-    current.percentage > best.percentage ? current : best
-  , { percentage: 0, day: 0 });
+  const bestDay = heatmapData.length > 0 
+    ? heatmapData.reduce((best, current) => 
+        current.percentage > best.percentage ? current : best
+      , { percentage: 0, day: 0 })
+    : { percentage: 0, day: 0 };
   const currentStreak = calculateCurrentStreak();
 
   function calculateCurrentStreak(): number {
@@ -142,16 +222,16 @@ export const Heatmap: React.FC = () => {
       animate="visible"
       className="bg-white rounded-xl shadow-sm overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-green-600" />
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 p-3 border-b border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-green-600" />
           Consistency Heatmap
         </h3>
       </div>
 
-      <div className="p-6">
+      <div className="p-4">
         {/* Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
               {totalCompleted}/{totalPossible}
@@ -255,6 +335,174 @@ export const Heatmap: React.FC = () => {
             <div>Most productive day: Day {bestDay.day} ({bestDay.percentage.toFixed(0)}% completion)</div>
             <div>Current consistency streak: {currentStreak} {currentStreak === 1 ? 'day' : 'days'}</div>
             <div>Monthly consistency: {averagePercentage.toFixed(1)}% average daily completion</div>
+          </div>
+        </motion.div>
+
+        {/* Day Timer */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-1">Day Timer</h4>
+              <p className="text-xs text-gray-600">Time remaining until midnight</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="bg-white px-3 py-2 rounded-lg shadow-sm border border-purple-200">
+                <div className="flex items-center gap-1 text-2xl font-bold text-purple-700">
+                  <span>{String(timeLeft.hours).padStart(2, '0')}</span>
+                  <span className="text-purple-400">:</span>
+                  <span>{String(timeLeft.minutes).padStart(2, '0')}</span>
+                  <span className="text-purple-400">:</span>
+                  <span>{String(timeLeft.seconds).padStart(2, '0')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Global Times */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-1">Global Times</h4>
+              <p className="text-xs text-gray-600">Important cities around the world</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {globalTimes.map((city, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="text-sm font-medium text-gray-700">{city.city}</div>
+                <div className="bg-white px-3 py-1 rounded-lg shadow-sm border border-blue-200">
+                  <div className="text-sm font-bold text-blue-700">{city.time}</div>
+                  <div className="text-xs text-gray-500">{city.offset}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* 3D Rotating Globe */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-1">World Clock</h4>
+              <p className="text-xs text-gray-600">Global time visualization</p>
+            </div>
+          </div>
+          <div className="flex justify-center items-center h-32">
+            <div className="relative w-24 h-24">
+              {/* 3D Globe Container */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg overflow-hidden">
+                {/* Globe Surface */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 animate-spin" style={{ animationDuration: '20s' }}>
+                  {/* Continents simplified representation */}
+                  <div className="absolute top-4 left-6 w-8 h-6 bg-green-600 rounded-full opacity-70"></div>
+                  <div className="absolute top-8 right-4 w-6 h-4 bg-green-600 rounded-full opacity-70"></div>
+                  <div className="absolute bottom-6 left-8 w-4 h-3 bg-green-600 rounded-full opacity-70"></div>
+                  <div className="absolute bottom-8 right-6 w-6 h-5 bg-green-600 rounded-full opacity-70"></div>
+                  <div className="absolute top-12 left-4 w-3 h-2 bg-green-600 rounded-full opacity-70"></div>
+                </div>
+                {/* Globe Shine Effect */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white to-transparent opacity-30"></div>
+                {/* Globe Shadow */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-transparent to-black opacity-20"></div>
+              </div>
+              {/* Globe Stand */}
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-gray-600 rounded-full"></div>
+              <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-12 h-2 bg-gray-700 rounded-full"></div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Virtual Pet - Animated Dog */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-orange-50 rounded-xl border border-pink-200"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-1">Your Virtual Pet</h4>
+              <p className="text-xs text-gray-600">Watch your playful companion!</p>
+            </div>
+          </div>
+          <div className="flex justify-center items-center h-32">
+            <div className="relative w-32 h-32">
+              {/* Dog Body */}
+              <div className="absolute bottom-8 left-8 w-16 h-12 bg-amber-600 rounded-full">
+                {/* Dog Head */}
+                <div className="absolute -top-2 left-6 w-10 h-10 bg-amber-600 rounded-full">
+                  {/* Dog Ears */}
+                  <div className="absolute top-0 left-0 w-3 h-6 bg-amber-700 rounded-full transform -rotate-12"></div>
+                  <div className="absolute top-0 right-0 w-3 h-6 bg-amber-700 rounded-full transform rotate-12"></div>
+                  {/* Dog Eyes */}
+                  <div className="absolute top-3 left-2 w-1 h-1 bg-black rounded-full animate-pulse"></div>
+                  <div className="absolute top-3 right-2 w-1 h-1 bg-black rounded-full animate-pulse"></div>
+                  {/* Dog Nose */}
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-black rounded-full"></div>
+                </div>
+                {/* Dog Tail */}
+                <div className="absolute -right-2 top-2 w-8 h-2 bg-amber-600 rounded-full animate-pulse origin-left">
+                  <div className="absolute inset-0 bg-amber-700 rounded-full"></div>
+                </div>
+                {/* Dog Legs */}
+                <div className="absolute bottom-0 left-2 w-2 h-4 bg-amber-700 rounded-full"></div>
+                <div className="absolute bottom-0 right-2 w-2 h-4 bg-amber-700 rounded-full"></div>
+              </div>
+              
+              {/* Ball */}
+              <motion.div
+                animate={{
+                  x: [0, 20, 0, -20, 0],
+                  y: [0, -10, 0, -10, 0],
+                  rotate: [0, 180, 360, 540, 720]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute bottom-6 right-4 w-6 h-6 bg-red-500 rounded-full shadow-lg"
+              >
+                <div className="absolute inset-1 bg-red-400 rounded-full"></div>
+                <div className="absolute top-1 left-1 w-1 h-1 bg-white rounded-full opacity-70"></div>
+              </motion.div>
+
+              {/* Ground */}
+              <div className="absolute bottom-0 left-0 right-0 h-2 bg-green-400 rounded-full opacity-50"></div>
+              
+              {/* Motion Lines */}
+              <motion.div
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="absolute bottom-10 left-2 w-4 h-0.5 bg-gray-400 rounded-full"
+              ></motion.div>
+              <motion.div
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
+                className="absolute bottom-12 left-4 w-3 h-0.5 bg-gray-400 rounded-full"
+              ></motion.div>
+              <motion.div
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity, delay: 0.6 }}
+                className="absolute bottom-8 left-6 w-2 h-0.5 bg-gray-400 rounded-full"
+              ></motion.div>
+            </div>
           </div>
         </motion.div>
       </div>

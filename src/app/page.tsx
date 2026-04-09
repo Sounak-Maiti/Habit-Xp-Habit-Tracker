@@ -13,25 +13,39 @@ import { Heatmap } from '@/components/Heatmap';
 import { MotivationalQuotes } from '@/components/MotivationalQuotes';
 import { Logo } from '@/components/Logo';
 import { PieCharts } from '@/components/PieCharts';
-import { StockCharts } from '@/components/StockCharts';
+import { PerformanceHistogram } from '@/components/PerformanceHistogram';
 import { BarGraphs } from '@/components/BarGraphs';
 import { Histograms } from '@/components/Histograms';
+import { GamificationStats } from '@/components/GamificationStats';
+import { LevelBadge } from '@/components/LevelBadge';
+import { AnimatedPlant } from '@/components/AnimatedPlant';
 import { useHabitStore } from '@/store/habitStore';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [showLevelBadge, setShowLevelBadge] = useState(false);
+  const [lastLevel, setLastLevel] = useState(0);
   const { 
     habits, 
     selectedYear, 
     selectedMonth, 
     getDaysInMonth, 
     getHabitDay,
-    calculateStreak 
+    calculateStreak,
+    currentLevel 
   } = useHabitStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Level up detection
+  useEffect(() => {
+    if (mounted && currentLevel > lastLevel) {
+      setShowLevelBadge(true);
+    }
+    setLastLevel(currentLevel);
+  }, [currentLevel, lastLevel, mounted]);
 
   // Calculate real quick stats
   const calculateQuickStats = () => {
@@ -119,6 +133,11 @@ export default function Home() {
     }
   };
 
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
     <div className="h-screen bg-gradient-to-br from-lavender-50 via-purple-50 to-pink-50 flex flex-col">
       {/* Header */}
@@ -151,105 +170,140 @@ export default function Home() {
         animate="visible"
         className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-4"
       >
-        <div className="w-full">
-          {/* Top Section - Dashboard and Goals */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="w-full space-y-6">
+          {/* Gamification Stats */}
+          <GamificationStats />
+
+          {/* Hero Section */}
+          <motion.div
+            variants={itemVariants}
+            className="text-center py-6"
+          >
+            <motion.h1 
+              variants={itemVariants}
+              className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4"
+            >
+              Level Up Your Life with Habits
+            </motion.h1>
+            <motion.p 
+              variants={itemVariants}
+              className="text-xl text-gray-600 max-w-2xl mx-auto"
+            >
+              Earn XP for consistency, build habits like a game
+            </motion.p>
+          </motion.div>
+
+          {/* Dashboard Section */}
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
             <div className="lg:col-span-2">
               <Dashboard />
             </div>
             <div>
               <GoalsPanel />
             </div>
-          </div>
+          </motion.div>
 
           {/* Calendar Section */}
-          <div className="mb-6">
+          <motion.div
+            variants={itemVariants}
+            className="space-y-4"
+          >
             <CalendarHeader />
-            <div className="mt-4">
-              <HabitGrid />
-            </div>
-          </div>
+            <HabitGrid />
+          </motion.div>
 
-          {/* Habit Stats - Full Width */}
-          <div className="mb-6">
+          {/* Stats Section */}
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
             <HabitStats />
-          </div>
-
-          {/* Weekly Progress - Full Width */}
-          <div className="mb-6">
             <WeeklyProgress />
-          </div>
+          </motion.div>
 
-          {/* Analytics Grid - Properly Separated */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Column 1 - Heatmap */}
-            <div className="lg:col-span-1">
-              <Heatmap />
-            </div>
+          {/* Analytics Grid */}
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            <Heatmap />
+            <PieCharts />
+          </motion.div>
 
-            {/* Column 2 - Pie Charts */}
-            <div className="lg:col-span-1">
-              <PieCharts />
-            </div>
-          </div>
+          {/* Charts Section */}
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            <PerformanceHistogram />
+            <BarGraphs />
+          </motion.div>
 
-          {/* Charts Section - Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Stock Charts */}
-            <div>
-              <StockCharts />
-            </div>
-            
-            {/* Bar Graphs */}
-            <div>
-              <BarGraphs />
-            </div>
-          </div>
+          {/* Animated Plant Section */}
+          <motion.div
+            variants={itemVariants}
+          >
+            <AnimatedPlant />
+          </motion.div>
 
           {/* Histograms Section */}
-          <div className="mb-6">
+          <motion.div
+            variants={itemVariants}
+          >
             <Histograms />
-          </div>
+          </motion.div>
 
-          {/* Bottom Section - Quick Stats and Quotes */}
-          <div className="mb-6">
-            {/* Quick Stats and Quotes - Takes full width */}
-            <div className="flex flex-col gap-6">
-              {/* Quick Stats */}
+          {/* Bottom Section */}
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
+            {/* Quick Stats */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="lg:col-span-2"
+            >
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-white rounded-xl shadow-sm p-6"
+                variants={itemVariants}
+                className="bg-white rounded-xl shadow-lg p-8 border border-purple-100"
               >
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-3 mb-6">
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
                   Quick Stats
                 </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                    <span className="text-sm font-medium text-purple-700">Daily Focus</span>
-                    <span className="text-sm font-bold text-purple-900">{quickStats.dailyFocus} habits</span>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-purple-50 rounded-xl">
+                    <div className="text-2xl font-bold text-purple-900">{quickStats.dailyFocus}</div>
+                    <div className="text-sm text-purple-700 mt-1">Daily Focus</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <span className="text-sm font-medium text-blue-700">Weekly Goal</span>
-                    <span className="text-sm font-bold text-blue-900">{quickStats.weeklyCompleted}/{quickStats.weeklyTotal}</span>
+                  <div className="text-center p-4 bg-blue-50 rounded-xl">
+                    <div className="text-2xl font-bold text-blue-900">{quickStats.weeklyCompleted}/{quickStats.weeklyTotal}</div>
+                    <div className="text-sm text-blue-700 mt-1">Weekly Goal</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <span className="text-sm font-medium text-green-700">Monthly Target</span>
-                    <span className="text-sm font-bold text-green-900">{quickStats.monthlyCompleted}/{quickStats.monthlyTotal}</span>
+                  <div className="text-center p-4 bg-green-50 rounded-xl">
+                    <div className="text-2xl font-bold text-green-900">{quickStats.monthlyCompleted}/{quickStats.monthlyTotal}</div>
+                    <div className="text-sm text-green-700 mt-1">Monthly Target</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                    <span className="text-sm font-medium text-orange-700">Current Streak</span>
-                    <span className="text-sm font-bold text-orange-900">{quickStats.currentStreak} days</span>
+                  <div className="text-center p-4 bg-orange-50 rounded-xl">
+                    <div className="text-2xl font-bold text-orange-900">{quickStats.currentStreak}</div>
+                    <div className="text-sm text-orange-700 mt-1">Current Streak</div>
                   </div>
                 </div>
               </motion.div>
+            </motion.div>
 
-              {/* Motivational Quotes */}
+            {/* Motivational Quotes */}
+            <motion.div
+              variants={itemVariants}
+            >
               <MotivationalQuotes />
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </motion.main>
 
@@ -266,6 +320,12 @@ export default function Home() {
           </div>
         </div>
       </motion.footer>
+
+      {/* Level Badge Modal */}
+      <LevelBadge 
+        isVisible={showLevelBadge} 
+        onClose={() => setShowLevelBadge(false)} 
+      />
     </div>
   );
 }

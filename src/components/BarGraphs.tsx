@@ -71,47 +71,48 @@ export const BarGraphs: React.FC = () => {
 
   const weeklyComparisonData = calculateWeeklyComparisonData();
 
-  // Calculate real monthly trend data based on current and previous months
+  // Calculate real monthly trend data based on actual user habit completions
   const calculateMonthlyTrendData = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const currentMonthIndex = selectedMonth;
     
-    return months.slice(0, Math.min(6, currentMonthIndex + 1)).map((month, index) => {
-      // For simplicity, we'll show data for months up to the current month
-      // In a real implementation, you'd store historical data
-      const monthIndex = index;
-      let totalHabits = 0;
-      let totalCompletion = 0;
+    return months.map((month, index) => {
+      const targetMonth = index;
+      const targetYear = selectedYear;
+      let totalCompleted = 0;
+      let totalPossible = 0;
       
-      // Calculate for this month (simplified - would need historical data)
-      if (monthIndex === currentMonthIndex) {
-        // Current month - use real data
-        habits.forEach(habit => {
-          let completedDays = 0;
-          for (let day = 1; day <= getDaysInMonth(); day++) {
-            const date = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            if (getHabitDay(habit.id, date)) {
-              completedDays++;
-            }
+      // Get days in the target month
+      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      
+      // Check for actual habit completions in this specific month
+      habits.forEach(habit => {
+        let completedDays = 0;
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          if (getHabitDay(habit.id, date)) {
+            completedDays++;
           }
-          const completionRate = getDaysInMonth() > 0 ? (completedDays / getDaysInMonth()) * 100 : 0;
-          totalHabits++;
-          totalCompletion += completionRate;
-        });
-      } else {
-        // Previous months - show only current month data or skip
-        return null; // Skip months with no real data
-      }
+        }
+        
+        totalCompleted += completedDays;
+        totalPossible += daysInMonth;
+      });
+      
+      // Calculate completion percentage: (completed / possible) * 100
+      const completionPercentage = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
       
       return {
         month,
-        habits: totalHabits,
-        completion: totalHabits > 0 ? Math.round(totalCompletion / totalHabits) : 0,
+        habits: habits.length,
+        completion: completionPercentage,
+        totalCompleted,
+        totalPossible
       };
     });
   };
 
-  const monthlyTrendData = calculateMonthlyTrendData().filter(item => item !== null);
+  const monthlyTrendData = calculateMonthlyTrendData();
 
   // Calculate real category performance data
   const calculateCategoryPerformanceData = () => {
@@ -179,15 +180,19 @@ export const BarGraphs: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-green-600 font-medium">
-              Average: {habitComparisonData.length > 0 ? 
-                Math.round(habitComparisonData.reduce((sum, habit) => sum + habit.completion, 0) / habitComparisonData.length) : 0}%
+              Average: {(() => {
+                if (habitComparisonData.length === 0) return '0%';
+                const totalCompletion = habitComparisonData.reduce((sum, habit) => sum + habit.completion, 0);
+                const average = Math.round(totalCompletion / habitComparisonData.length);
+                return `${average}%`;
+              })()}
             </span>
             <TrendingUp className="w-4 h-4 text-green-500" />
           </div>
         </div>
         
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="h-96">
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={habitComparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis 
@@ -221,7 +226,7 @@ export const BarGraphs: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-800">Weekly Performance</h3>
         </div>
         
-        <div className="h-64">
+        <div className="h-96">
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={weeklyComparisonData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -254,23 +259,32 @@ export const BarGraphs: React.FC = () => {
       </div>
 
       {/* Monthly Trend */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100 col-span-4 lg:col-span-3">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-purple-600" />
             <h3 className="text-lg font-semibold text-gray-800">6-Month Trend</h3>
           </div>
           <span className="text-sm text-purple-600 font-medium">
-            {monthlyTrendData.length > 1 ? 
-              `Growth: ${monthlyTrendData.length > 1 && monthlyTrendData[monthlyTrendData.length - 1] && monthlyTrendData[monthlyTrendData.length - 2] ? 
-                Math.round(((monthlyTrendData[monthlyTrendData.length - 1].completion - monthlyTrendData[monthlyTrendData.length - 2].completion) / Math.max(monthlyTrendData[monthlyTrendData.length - 2].completion, 1)) * 100) : 0}%` : 
-              'No data'
-            }
+            {(() => {
+              const validData = monthlyTrendData.filter(d => d.completion > 0);
+              if (validData.length < 2) return 'No data';
+              
+              const firstMonth = validData[0].completion;
+              const lastMonth = validData[validData.length - 1].completion;
+              
+              if (firstMonth === 0 && lastMonth === 0) return 'Growth: 0%';
+              if (firstMonth === 0) return `Growth: +${lastMonth}%`;
+              
+              const growth = ((lastMonth - firstMonth) / firstMonth) * 100;
+              const growthStr = growth >= 0 ? `+${Math.round(growth)}%` : `${Math.round(growth)}%`;
+              return `Growth: ${growthStr}`;
+            })()}
           </span>
         </div>
         
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={monthlyTrendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis 
@@ -279,33 +293,34 @@ export const BarGraphs: React.FC = () => {
                 fontSize={12}
               />
               <YAxis 
-                stroke="#8b5cf6"
+                stroke="#10b981"
                 fontSize={12}
-                yAxisId="left"
-                orientation="left"
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
               />
-              <YAxis 
-                stroke="#ec4899"
-                fontSize={12}
-                yAxisId="right"
-                orientation="right"
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-white p-2 border border-gray-200 rounded shadow-sm">
+                        <p className="text-sm font-medium">{data.month}</p>
+                        <p className="text-sm text-green-600">{data.completion}% Completion</p>
+                        <p className="text-xs text-gray-500">{data.totalCompleted}/{data.totalPossible} completed</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar yAxisId="left" dataKey="habits" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
-              <Bar yAxisId="right" dataKey="completion" fill="#ec4899" radius={[8, 8, 0, 0]} />
+              <Bar 
+                dataKey="completion" 
+                fill="#10b981" 
+                radius={[8, 8, 0, 0]}
+                label={{ position: 'top', fontSize: 10, fill: '#059669' }}
+              />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        
-        <div className="flex justify-center gap-6 mt-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-purple-500 rounded"></div>
-            <span className="text-xs text-gray-600">Active Habits</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-pink-500 rounded"></div>
-            <span className="text-xs text-gray-600">Completion %</span>
-          </div>
         </div>
       </div>
 

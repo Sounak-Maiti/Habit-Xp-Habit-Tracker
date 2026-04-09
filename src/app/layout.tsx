@@ -14,20 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Habit Tracker - Build Better Habits Daily",
-  description: "A modern habit tracking app that helps you build consistency and achieve your goals. Track daily habits, visualize progress, and stay motivated with beautiful analytics.",
-  keywords: ["habit tracker", "daily habits", "goal tracking", "productivity", "consistency", "personal development"],
-  authors: [{ name: "Habit Tracker Team" }],
+  title: "Level Up Your Life with Habits - Gamified Habit System",
+  description: "Earn XP for consistency, build habits like a game! Transform your daily routines into an epic journey of self-improvement with streaks, levels, and achievements.",
+  keywords: ["gamified habits", "XP system", "level up habits", "habit game", "streak tracking", "achievement system", "productivity game"],
+  authors: [{ name: "Gamified Habit System Team" }],
   openGraph: {
-    title: "Habit Tracker - Build Better Habits Daily",
-    description: "A modern habit tracking app that helps you build consistency and achieve your goals.",
+    title: "Level Up Your Life with Habits - Gamified Habit System",
+    description: "Earn XP for consistency, build habits like a game! Transform your daily routines into an epic journey.",
     type: "website",
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Habit Tracker - Build Better Habits Daily",
-    description: "A modern habit tracking app that helps you build consistency and achieve your goals.",
+    title: "Level Up Your Life with Habits - Gamified Habit System",
+    description: "Earn XP for consistency, build habits like a game! Transform your daily routines into an epic journey.",
   },
 };
 
@@ -64,7 +64,7 @@ export default function RootLayout({
               });
               
               // Override window.ethereum if it exists to prevent connections
-              if (typeof window !== 'undefined') {
+              if (typeof window !== 'undefined' && !window.hasOwnProperty('ethereum')) {
                 Object.defineProperty(window, 'ethereum', {
                   value: undefined,
                   writable: false,

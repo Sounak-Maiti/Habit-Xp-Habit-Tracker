@@ -17,6 +17,16 @@ const COLORS = [
   '#84cc16', // lime-500
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 }
@@ -139,11 +149,11 @@ export const PieCharts: React.FC = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
+      variants={containerVariants}
       className="space-y-6"
     >
       {/* Habit Completion Pie Chart */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100 min-h-[600px]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <PieChartIcon className="w-5 h-5 text-purple-600" />
@@ -183,7 +193,7 @@ export const PieCharts: React.FC = () => {
       </div>
 
       {/* Category Distribution */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100 min-h-[600px]">
         <div className="flex items-center gap-2 mb-4">
           <PieChartIcon className="w-5 h-5 text-purple-600" />
           <h3 className="text-lg font-semibold text-gray-800">Category Distribution</h3>
@@ -213,7 +223,7 @@ export const PieCharts: React.FC = () => {
 
       {/* Weekly Performance */}
       <motion.div variants={itemVariants}>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100 min-h-[600px]">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-purple-600" />
             <h3 className="text-lg font-semibold text-gray-800">Weekly Performance</h3>

@@ -139,7 +139,10 @@ export const Histograms: React.FC = () => {
         const habitDay = getHabitDayDetails(habit.id, date);
         
         if (habitDay && habitDay.completed && habitDay.completedAt) {
-          const completionHour = habitDay.completedAt.getHours();
+          const completionDate = typeof habitDay.completedAt === 'string' 
+            ? new Date(habitDay.completedAt) 
+            : habitDay.completedAt;
+          const completionHour = completionDate.getHours();
           
           // Only count if within our display range (6 AM - 11 PM)
           if (completionHour >= 6 && completionHour <= 23) {
@@ -161,48 +164,7 @@ export const Histograms: React.FC = () => {
     return hours;
   };
 
-  // Calculate real difficulty distribution based on habit goals
-  const calculateDifficultyDistribution = () => {
-    const difficultyStats: { [key: string]: { count: number; color: string } } = {
-      'Very Easy': { count: 0, color: HISTOGRAM_COLORS.success },
-      'Easy': { count: 0, color: HISTOGRAM_COLORS.tertiary },
-      'Medium': { count: 0, color: HISTOGRAM_COLORS.warning },
-      'Hard': { count: 0, color: HISTOGRAM_COLORS.danger },
-      'Very Hard': { count: 0, color: HISTOGRAM_COLORS.primary },
-    };
-    
-    habits.forEach(habit => {
-      // Determine difficulty based on goal and current performance
-      let completedDays = 0;
-      for (let day = 1; day <= getDaysInMonth(); day++) {
-        const date = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        if (getHabitDay(habit.id, date)) {
-          completedDays++;
-        }
-      }
-      
-      const completionRate = getDaysInMonth() > 0 ? (completedDays / getDaysInMonth()) * 100 : 0;
-      const goalRatio = habit.goal > 0 ? (completedDays / habit.goal) * 100 : 100;
-      
-      // Classify difficulty based on goal achievement
-      let difficulty = 'Medium';
-      if (goalRatio >= 90) difficulty = 'Very Easy';
-      else if (goalRatio >= 75) difficulty = 'Easy';
-      else if (goalRatio >= 50) difficulty = 'Medium';
-      else if (goalRatio >= 25) difficulty = 'Hard';
-      else difficulty = 'Very Hard';
-      
-      difficultyStats[difficulty].count++;
-    });
-    
-    const total = habits.length || 1;
-    return Object.entries(difficultyStats).map(([difficulty, stats]) => ({
-      difficulty,
-      count: stats.count,
-      percentage: Math.round((stats.count / total) * 100),
-      color: stats.color,
-    })).filter(item => item.count > 0);
-  };
+  // Habit Difficulty Distribution removed - not based on user input
 
   // Calculate real weekly completion distribution
   const calculateWeeklyCompletion = () => {
@@ -212,12 +174,17 @@ export const Histograms: React.FC = () => {
       let completions = 0;
       
       habits.forEach(habit => {
-        // Calculate completion for this weekday (simplified - would need actual date mapping)
-        for (let week = 0; week < 4; week++) {
-          const dayOfMonth = (week * 7) + index + 1;
-          if (dayOfMonth <= getDaysInMonth()) {
-            const date = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`;
-            if (getHabitDay(habit.id, date)) {
+        // Find all days in the month that match this weekday (0=Sunday, 1=Monday, etc.)
+        for (let dayOfMonth = 1; dayOfMonth <= getDaysInMonth(); dayOfMonth++) {
+          const date = new Date(selectedYear, selectedMonth, dayOfMonth);
+          const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+          
+          // Map our index (0=Monday, ..., 6=Sunday) to actual dayOfWeek (0=Sunday, 1=Monday, ..., 6=Saturday)
+          const actualDayOfWeek = index === 6 ? 0 : index + 1; // Monday=1, Tuesday=2, ..., Saturday=6, Sunday=0
+          
+          if (dayOfWeek === actualDayOfWeek) {
+            const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`;
+            if (getHabitDay(habit.id, dateStr)) {
               completions++;
             }
           }
@@ -237,7 +204,6 @@ export const Histograms: React.FC = () => {
   const streakLengths = calculateStreakLengths();
   const streakDistributionData = calculateStreakDistribution();
   const hourlyActivityData = calculateHourlyActivity();
-  const difficultyDistributionData = calculateDifficultyDistribution();
   const weeklyCompletionData = calculateWeeklyCompletion();
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -387,49 +353,7 @@ export const Histograms: React.FC = () => {
         </div>
       </div>
 
-      {/* Difficulty Distribution */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-800">Habit Difficulty Distribution</h3>
-          </div>
-          <span className="text-sm text-green-600 font-medium">
-            {difficultyDistributionData.length > 0 ? 
-              `${Math.round((difficultyDistributionData.find(d => d.difficulty === 'Easy')?.count || 0) / difficultyDistributionData.reduce((sum, d) => sum + d.count, 0) * 100)}% Easy` : 
-              'No data'
-            }
-          </span>
-        </div>
-        
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={difficultyDistributionData} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis 
-                type="number"
-                stroke="#6b7280"
-                fontSize={12}
-                label={{ value: 'Count', position: 'insideBottom', offset: -5, style: { fill: '#6b7280' } }}
-              />
-              <YAxis 
-                type="category"
-                dataKey="difficulty" 
-                stroke="#6b7280"
-                fontSize={12}
-                width={80}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                {difficultyDistributionData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
+      
       {/* Weekly Completion Pattern */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
         <div className="flex items-center justify-between mb-4">

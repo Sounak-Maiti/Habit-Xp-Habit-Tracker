@@ -169,3 +169,5 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 TRY OUT THE LIVE SITE: https://habit-xp-henna.vercel.app/
+
+NOTE THAT THIS SITE IS ENHANCED USING WINDSURF AI AGENT ALONG WITH DEVELOPER CODING.
